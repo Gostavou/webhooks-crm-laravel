@@ -1,8 +1,7 @@
 <?php
 
 use App\Http\Controllers\WebhookController;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\CrmDealWebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -10,3 +9,9 @@ Route::get('/health', function () {
 });
 
 Route::post('/webhook', [WebhookController::class, 'handle']);
+
+// Webhook de Deal
+Route::post(
+    '/api/v1/webhooks/crm',
+    [CrmDealWebhookController::class, 'handle']
+);

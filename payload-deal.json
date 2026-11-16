@@ -1,0 +1,62 @@
+{
+  "event_id": "evt-2026-001",
+  "event_type": "deal.updated",
+  "organization": {
+    "external_id": "org-001",
+    "name": "Orbi Edtech",
+    "industry": "Education"
+  },
+  "deal": {
+    "external_id": "deal-001",
+    "title": "Contrato Enterprise Plan",
+    "value": 12450.00,
+    "stage": "won",
+    "pipeline": "vendas_b2b",
+    "currency": "BRL"
+  },
+  "contacts": [
+    {
+      "external_id": "contact-001",
+      "first_name": "Rafael",
+      "last_name": "Otto",
+      "email": "rafael@example.com",
+      "phone": "+5545999999999",
+      "role": "decisor",
+      "is_primary": true
+    },
+    {
+      "external_id": "contact-002",
+      "first_name": "Ana",
+      "last_name": "Silva",
+      "email": "ana@example.com",
+      "role": "stakeholder",
+      "is_primary": false
+    }
+  ],
+  "line_items": [
+    {
+      "external_id": "item-001",
+      "name": "Enterprise Plan",
+      "quantity": 2,
+      "unit_price": 6225.00
+    }
+  ],
+  "activities": [
+    {
+      "external_id": "activity-001",
+      "type": "meeting",
+      "subject": "Reuniao comercial",
+      "description": "Apresentacao do contrato",
+      "occurred_at": "2026-11-16T11:00:00Z"
+    }
+  ],
+  "custom_fields": {
+    "segment": "Education",
+    "interesse": "Enterprise Plan"
+  },
+  "metadata": {
+    "campaign": "novembro_2026",
+    "source": "crm",
+    "tags": ["enterprise", "prioridade"]
+  }
+}

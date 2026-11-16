@@ -1,0 +1,20 @@
+{
+  "user": {
+    "test": true,
+    "timestamp": "2026-09-16T11:41:57Z"
+  },
+  "lead": {
+    "first_name": "Rafael",
+    "last_name": "Otto",
+    "email": "rafael@example.com",
+    "phone": "+5545999999999",
+    "company": "Orbi Edtech",
+    "job_title": "CTO",
+    "source": "API Integration",
+    "status": "new",
+    "custom_fields": {
+      "segment": "Education",
+      "interesse": "Enterprise Plan"
+    }
+  }
+}

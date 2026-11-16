@@ -6,129 +6,91 @@ use App\Jobs\SaveLeadDataJob;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Lead;
-use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 
 class WebhookService
 {
-    private array $requiredFields = [
-        'first_name',
-        'last_name',
-        'email',
-        'source',
-        'status'
-    ];
-
-    public function handle(array $data)
+    public function handle(array $data): void
     {
-        Log::info('Dados do usuário: ' . json_encode($data['data']['user']));
+        $requestId = $data['_request_id'] ?? null;
+        $payload = $data['data'] ?? $data;
+        $lead = $payload['lead'] ?? null;
 
-        if (!isset($data['data']['user']['email']) || !isset($data['data']['user']['name'])) {
-            Log::info('Email ou nome do usuário não informado, retornando sem processar!');
-
-            return;
+        if (!is_array($lead)) {
+            throw new InvalidArgumentException(
+                'Dados do lead não encontrados.'
+            );
         }
 
-        if (!isset($data['data']['lead'])) {
-            Log::info('Informações do Lead não fornecidas, retornando sem processar!');
+        Log::info('job.lead.recebido', [
+            'request_id' => $requestId,
+            'email' => $lead['email'] ?? null,
+        ]);
 
-            return;
-        }
+        $lead['_request_id'] = $requestId;
 
-        if (!$this->validateLead($data['data']['lead'])) {
-            Log::info('Informações do Lead incompletas, retornando sem processar!');
+        SaveLeadDataJob::dispatch($lead);
 
-            return;
-        }
-
-        $user = $this->findOrCreateUser($data['data']['user']);
-
-        Log::info('Usuário criado no banco de dados: ' . json_encode($user->toArray()));
-
-        SaveLeadDataJob::dispatch($data['data']['lead']);
+        Log::info('job.lead.enfileirado', [
+            'request_id' => $requestId,
+            'queue' => 'save-lead',
+        ]);
     }
 
-    private function findOrCreateUser(array $user)
+    public function findOrCreateLead(array $lead): Lead
     {
-        $existingUser = User::query()->where('email', $user['email'])->first();
+        $requestId = $lead['_request_id'] ?? null;
 
-        if (!$existingUser) {
-            $existingUser = User::create([
-                'name' => $user['name'],
-                'email' => $user['email'],
-                'password' => bcrypt('password')
-            ]);
-        }
+        Log::info('job.lead.persistencia.inicio', [
+            'request_id' => $requestId,
+        ]);
 
-        return $existingUser;
-    }
-
-    private function validateLead(array $lead)
-    {
-        foreach ($this->requiredFields as $field) {
-            if (!array_key_exists($field, $lead)) return false;
-        }
-
-        return true;
-    }
-
-    public function findOrCreateLead(array $lead)
-    {
-        $createdLead = Lead::query()->orWhere(function ($query) use ($lead) {
-            $query->where('phone', $lead['phone'])
-                ->orWhere('email', $lead['email']);
-        })->first();
-
-        Log::info('Usuário encontrado no banco de dados: ' . is_null($createdLead) ? '' : json_encode($createdLead->toArray()));
-
-        if (!$createdLead) {
-            $company = $this->findOrCreateCompany($lead['company']);
-
-            Log::info('Empresa encontrada no banco de dados: ' . json_encode($company->toArray()));
-
-            $customField = $this->findOrCreateCustomFields($lead['custom_fields']);
-
-            Log::info('Campo personalizado criado: ' . is_null($customField) ? '' :  json_encode($customField->toArray()));
-
-            $createdLead = Lead::create([
-                'first_name' =>  $lead['first_name'],
-                'last_name' =>  $lead['last_name'],
-                'email' =>  $lead['email'],
-                'phone' =>  $lead['phone'],
-                'company_id' =>  $company->id,
-                'job_title' =>  $lead['job_title'],
-                'source' =>  $lead['source'],
-                'status' =>  $lead['status']
+        $createdLead = DB::transaction(function () use ($lead) {
+            $company = Company::firstOrCreate([
+                'name' => $lead['company'],
             ]);
 
-            $createdLead->customFields()->attach($customField->id);
-        }
+            $values = [
+                'first_name' => $lead['first_name'],
+                'last_name' => $lead['last_name'],
+                'email' => $lead['email'],
+                'phone' => $lead['phone'] ?? null,
+                'company_id' => $company->id,
+                'job_title' => $lead['job_title'] ?? null,
+                'source' => $lead['source'],
+                'status' => $lead['status'],
+            ];
 
-        Log::info('Lead criado com sucesso! ' . json_encode($createdLead->toArray()));
+            $createdLead = Lead::updateOrCreate(
+                ['email' => $lead['email']],
+                $values
+            );
 
-        return $lead;
-    }
+            $customFields = $lead['custom_fields'] ?? [];
 
-    private function findOrCreateCompany(string $companyName)
-    {
-        return Company::firstOrCreate(
-            ['name' =>  $companyName],
-            [
-                'name' => $companyName
-            ]
-        );
-    }
+            if (
+                !empty($customFields['segment']) &&
+                !empty($customFields['interesse'])
+            ) {
+                $customField = CustomField::firstOrCreate([
+                    'segment' => $customFields['segment'],
+                    'interest' => $customFields['interesse'],
+                ]);
 
-    private function findOrCreateCustomFields(?array $customField = null)
-    {
-        if (!$customField) return null;
+                $createdLead->customFields()
+                    ->syncWithoutDetaching([$customField->id]);
+            }
 
-        return CustomField::firstOrCreate(
-            ['segment' => $customField['segment']],
-            [
-                'segment' => $customField['segment'],
-                'interest' => $customField['interesse']
-            ]
-        );
+            return $createdLead;
+        }, 3);
+
+        Log::info('job.lead.persistencia.sucesso', [
+            'request_id' => $requestId,
+            'lead_id' => $createdLead->id,
+        ]);
+
+        return $createdLead;
     }
 }
